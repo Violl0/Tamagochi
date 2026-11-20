@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Тамагочи</title>
+    <style>
+        body { font-family: Arial; background: #f4f4f4; text-align: center; padding: 20px; }
+        #kart { background: white; display: inline-block; padding: 20px 40px; border-radius: 10px; }
+        .shkala { text-align: left; margin: 8px 0; font-size: 18px; }
+        .podskazka { color: #c0392b; font-weight: bold; }
+        button { font-size: 16px; padding: 10px 16px; margin: 5px; cursor: pointer; }
+        #petImg { width: 150px; height: 175px; image-rendering: pixelated; image-rendering: crisp-edges; }
+        #igraPolosa { position: relative; width: 280px; height: 28px; background: #ddd; margin: 10px auto; }
+        #zelZona { position: absolute; left: 34%; width: 32%; height: 100%; background: #7df09a; }
+        #marker { position: absolute; left: 0; width: 8px; height: 100%; background: #333; }
+        #demo { position: fixed; left: 8px; top: 8px; text-align: left; z-index: 10; }
+        #demo button { font-size: 13px; padding: 5px 8px; margin: 2px; }
+    </style>
+</head>
+<body>
+
+
+    <div id="demo">
+        <button onclick="pokazSost('normal')">Обычный</button><br>
+        <button onclick="pokazSost('hungry')">Голодный</button><br>
+        <button onclick="pokazSost('sick')">Больной</button><br>
+        <button onclick="pokazSost('tired')">Усталый</button><br>
+        <button onclick="pokazSost('sad')">Грустный</button><br>
+        <button onclick="pokazSost('')">По-настоящему</button>
+    </div>
+
+    <div id="kart">
+        <h2>Тамагочи</h2>
+        <div><img id="petImg" alt="Питомец"></div>
+        <div id="imyaVid">Питомец не создан</div>
+
+        <div class="shkala">Голод: <span id="golod"></span></div>
+        <div class="shkala">Здоровье: <span id="zdorovie"></span></div>
+        <div class="shkala">Настроение: <span id="nastroenie"></span></div>
+        <div class="shkala">Энергия: <span id="energiya"></span></div>
+        <div class="shkala">Монеты: <span id="monety"></span></div>
+
+        <div id="soobshenie"></div>
+
+        <div style="margin-top: 15px;">
+            <button id="kormitBtn" onclick="deistvie('/pokormit')">Покормить</button>
+            <button id="igratBtn" onclick="startIgra()">Поиграть</button>
+            <button id="lechitBtn" onclick="deistvie('/polechit')">Полечить</button>
+        </div>
+        <div style="margin-top: 5px;">
+            <button id="spatBtn" onclick="deistvie('/spat')">Спать</button>
+            <button id="otdyhBtn" onclick="deistvie('/otdyh')">Отдохнуть</button>
+        </div>
+
+
+        <div id="igra" style="display:none;">
+            <div id="igraPolosa"><div id="zelZona"></div><div id="marker"></div></div>
+            <button onclick="stopIgra()">Стоп</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <input id="novoeImya" placeholder="Имя питомца" style="font-size:16px; padding:8px;">
+            <select id="noviyVid" style="font-size:16px; padding:8px;">
+                <option value="1">кот</option>
+                <option value="2">пёс</option>
+                <option value="3">хомяк</option>
+                <option value="4">дракон</option>
+            </select>
+            <button onclick="sozdatPitomca()">Создать</button>
+            <button onclick="sbrosit()">Заново</button>
+        </div>
+    </div>
+
+    <script>
+
+        function poloska(z) {
+            var s = "|";
+            for (var i = 0; i < 10; i++) {
+                if (z >= (i + 1) * 10) {
+                    s = s + "#";
+                } else {
+                    s = s + ".";
+                }
+            }
+            s = s + "|";
+            return s;
+        }
+
+
+        function failSpraita(vid) {
+            if (vid == "кот") return "kot";
+            if (vid == "пёс") return "pes";
+            if (vid == "хомяк") return "homyak";
+            if (vid == "дракон") return "drakon";
+            return "kot";
+        }
+
+
+        function sostoyanie(p) {
+            if (p.mertviy) return "sad";
+            if (p.zdorovie <= 30) return "sick";
+            if (p.golod >= 80) return "hungry";
+            if (p.energiya <= 20) return "tired";
+            if (p.nastroenie <= 20) return "sad";
+            return "normal";
+        }
+
+
+        function chasMinSek(ms) {
+            var sek = Math.floor(ms / 1000);
+            if (sek < 0) sek = 0;
+            var ch = Math.floor(sek / 3600);
+            var min = Math.floor((sek % 3600) / 60);
+            var sec = sek % 60;
+            return ch + " ч " + min + " мин " + sec + " сек";
+        }
+
+
+        let prinudSost = "";
+
+
+        function pokazSost(s) {
+            prinudSost = s;
+            obnovi();
+        }
+
+
+        async function obnovi() {
+            var otvet = await fetch("/state");
+            var p = await otvet.json();
+
+
+            var spit = p.spitsya_do > Date.now();
+            var otdyh = p.otdyhaet_do > Date.now();
+            var zanyat = spit || otdyh;
+
+            var img = document.getElementById("petImg");
+            if (p.imya == "") {
+                img.style.display = "none";
+                document.getElementById("imyaVid").innerHTML = "Питомец не создан";
+            } else {
+                img.style.display = "block";
+                var sost = prinudSost ? prinudSost : (spit ? "tired" : sostoyanie(p));
+                img.src = "pets/" + failSpraita(p.vid) + "_" + sost + ".png";
+                document.getElementById("imyaVid").innerHTML = p.imya + " (" + p.vid + ")";
+            }
+
+            document.getElementById("golod").innerHTML = p.golod + " " + poloska(p.golod);
+            document.getElementById("zdorovie").innerHTML = p.zdorovie + " " + poloska(p.zdorovie);
+            document.getElementById("nastroenie").innerHTML = p.nastroenie + " " + poloska(p.nastroenie);
+            document.getElementById("energiya").innerHTML = p.energiya + " " + poloska(p.energiya);
+            document.getElementById("monety").innerHTML = p.monety;
+
+
+            document.getElementById("kormitBtn").disabled = zanyat || p.monety <= 0;
+            document.getElementById("igratBtn").disabled = zanyat;
+            document.getElementById("lechitBtn").disabled = zanyat;
+            document.getElementById("spatBtn").disabled = zanyat;
+            document.getElementById("otdyhBtn").disabled = zanyat;
+
+            var soobshenie = "";
+
+            if (spit) {
+                soobshenie = soobshenie + "<div class='podskazka'>Питомец спит, осталось " + chasMinSek(p.spitsya_do - Date.now()) + "</div>";
+            }
+            if (otdyh) {
+                soobshenie = soobshenie + "<div class='podskazka'>Питомец отдыхает, осталось " + chasMinSek(p.otdyhaet_do - Date.now()) + "</div>";
+            }
+
+            if (p.mertviy == true) {
+                soobshenie = soobshenie + "<div class='podskazka'>" + p.imya + " умер. Нажми Заново.</div>";
+            } else {
+                if (p.golod >= 80) soobshenie = soobshenie + "<div class='podskazka'>! очень голодный</div>";
+                if (p.zdorovie <= 30) soobshenie = soobshenie + "<div class='podskazka'>! болеет</div>";
+                if (p.energiya <= 20) soobshenie = soobshenie + "<div class='podskazka'>! устал</div>";
+                if (p.nastroenie <= 20) soobshenie = soobshenie + "<div class='podskazka'>! грустит</div>";
+            }
+            document.getElementById("soobshenie").innerHTML = soobshenie;
+        }
+
+
+        async function deistvie(url) {
+            var otvet = await fetch(url);
+            var p = await otvet.json();
+            obnovi();
+        }
+
+
+
+        let igraId = null, pos = 0, dir = 1;
+
+        function startIgra() {
+            document.getElementById("igra").style.display = "block";
+            pos = 0;
+            dir = 1;
+            igraId = setInterval(function () {
+                pos = pos + dir * 3;
+                if (pos > 100 || pos < 0) dir = -dir;
+                document.getElementById("marker").style.left = pos + "%";
+            }, 20);
+        }
+
+        function stopIgra() {
+            clearInterval(igraId);
+            document.getElementById("igra").style.display = "none";
+            var pobeda = (pos > 34 && pos < 66) ? "da" : "net";
+            fetch("/igra?pobeda=" + pobeda).then(function () { obnovi(); });
+        }
+
+
+        async function sozdatPitomca() {
+            var imya = document.getElementById("novoeImya").value;
+            var vid = document.getElementById("noviyVid").value;
+            var url = "/sozdat?imya=" + imya + "&vid=" + vid;
+            var otvet = await fetch(url);
+            var p = await otvet.json();
+            obnovi();
+        }
+
+
+        async function sbrosit() {
+            var otvet = await fetch("/sbros");
+            var p = await otvet.json();
+            obnovi();
+        }
+
+
+        obnovi();
+        setInterval(obnovi, 1000);
+    </script>
+
+</body>
+</html>
